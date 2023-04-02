@@ -16,6 +16,7 @@
 
 package xyz.gianlu.librespot.player.mixing;
 
+import jdk.internal.joptsimple.internal.Strings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import xyz.gianlu.librespot.player.Player;
@@ -25,6 +26,7 @@ import xyz.gianlu.librespot.player.mixing.output.*;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.function.Supplier;
 
 /**
  * @author devgianlu
@@ -58,13 +60,19 @@ public final class AudioSink implements Runnable, Closeable {
                 output = new StreamOutput(System.out, false);
                 break;
             case CUSTOM:
-                if (conf.outputClass == null || conf.outputClass.isEmpty())
+                if (conf.outputClassSupplier == null && Strings.isNullOrEmpty(conf.outputClass)) {
                     throw new IllegalArgumentException("Custom output sink class not configured!");
+                }
 
-                Object[] params = conf.outputClassParams;
-                if (params == null) params = new Object[0];
-                output = initCustomOutputSink(conf.outputClass, params);
-                break;
+                if (conf.outputClassSupplier != null) {
+                    output = initCustomOutputSinkClass(conf.outputClassSupplier);
+                    break;
+                } else {
+                    Object[] params = conf.outputClassParams;
+                    if (params == null) params = new Object[0];
+                    output = initCustomOutputSink(conf.outputClass, params);
+                    break;
+                }
             default:
                 throw new IllegalArgumentException("Unknown output: " + conf.output);
         }
@@ -74,6 +82,10 @@ public final class AudioSink implements Runnable, Closeable {
 
         thread = new Thread(this, "player-audio-sink");
         thread.start();
+    }
+
+    private static SinkOutput initCustomOutputSinkClass(@NotNull Supplier<SinkOutput> sinkOutputSupplier) {
+        return sinkOutputSupplier.get();
     }
 
     @NotNull
